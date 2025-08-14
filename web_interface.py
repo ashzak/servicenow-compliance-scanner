@@ -13,12 +13,17 @@ import json
 import asyncio
 from datetime import datetime
 from typing import Optional, Dict, List
-from crew import ComplianceScanningCrew
-from servicenow_connector import ServiceNowConnector
-from network_scanner import NetworkOSScanner
 from compliance_analyzer import ComplianceAnalyzer
 
+# Lazy imports to avoid dependency issues
+ComplianceScanningCrew = None
+ServiceNowConnector = None
+NetworkOSScanner = None
+
 app = FastAPI(title="ServiceNow CMDB Compliance Scanner", version="1.0.0")
+
+# Mount static files
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Global state for tracking scans
 active_scans = {}
@@ -39,199 +44,114 @@ class ScanStatus(BaseModel):
 
 @app.get("/", response_class=HTMLResponse)
 async def get_dashboard():
-    """Main dashboard"""
+    """Main dashboard with modern UI"""
     html_content = """
     <!DOCTYPE html>
-    <html>
+    <html lang="en">
     <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>ServiceNow CMDB Compliance Scanner</title>
-        <style>
-            body { font-family: Arial, sans-serif; margin: 40px; background-color: #f5f5f5; }
-            .container { max-width: 1200px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-            .header { text-align: center; margin-bottom: 40px; }
-            .header h1 { color: #333; margin-bottom: 10px; }
-            .header p { color: #666; font-size: 18px; }
-            .section { margin-bottom: 30px; padding: 20px; border: 1px solid #ddd; border-radius: 5px; }
-            .section h2 { color: #444; margin-top: 0; }
-            .button { background: #007bff; color: white; padding: 12px 24px; border: none; border-radius: 4px; cursor: pointer; margin: 5px; font-size: 16px; }
-            .button:hover { background: #0056b3; }
-            .button.secondary { background: #6c757d; }
-            .button.success { background: #28a745; }
-            .button.warning { background: #ffc107; color: #333; }
-            .status { padding: 15px; border-radius: 4px; margin: 10px 0; }
-            .status.success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
-            .status.error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
-            .status.info { background: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; }
-            .form-group { margin: 15px 0; }
-            .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
-            .form-group select, .form-group input { width: 200px; padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
-            .results { background: #f8f9fa; padding: 15px; border-radius: 4px; margin: 10px 0; }
-            .metric { display: inline-block; margin: 10px 20px 10px 0; padding: 10px 15px; background: #e9ecef; border-radius: 4px; }
-            .metric .value { font-size: 24px; font-weight: bold; color: #007bff; }
-            .metric .label { font-size: 12px; color: #666; }
-        </style>
-        <script>
-            async function startScan() {
-                const scope = document.getElementById('scope').value;
-                const mode = document.getElementById('mode').value;
-                const maxThreads = document.getElementById('maxThreads').value;
-                
-                try {
-                    const response = await fetch('/api/scan/start', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ scope, mode, max_threads: parseInt(maxThreads) })
-                    });
-                    
-                    const result = await response.json();
-                    
-                    if (response.ok) {
-                        document.getElementById('status').innerHTML = 
-                            `<div class="status info">Scan started with ID: ${result.scan_id}</div>`;
-                        pollScanStatus(result.scan_id);
-                    } else {
-                        document.getElementById('status').innerHTML = 
-                            `<div class="status error">Error: ${result.detail}</div>`;
-                    }
-                } catch (error) {
-                    document.getElementById('status').innerHTML = 
-                        `<div class="status error">Error: ${error.message}</div>`;
-                }
-            }
-            
-            async function pollScanStatus(scanId) {
-                const interval = setInterval(async () => {
-                    try {
-                        const response = await fetch(`/api/scan/status/${scanId}`);
-                        const status = await response.json();
-                        
-                        document.getElementById('status').innerHTML = 
-                            `<div class="status info">
-                                <strong>Scan ${scanId}</strong><br>
-                                Status: ${status.status}<br>
-                                Progress: ${status.progress}%<br>
-                                Message: ${status.message}
-                            </div>`;
-                        
-                        if (status.status === 'completed' || status.status === 'failed') {
-                            clearInterval(interval);
-                            if (status.results) {
-                                displayResults(status.results);
-                            }
-                        }
-                    } catch (error) {
-                        clearInterval(interval);
-                        document.getElementById('status').innerHTML = 
-                            `<div class="status error">Error polling status: ${error.message}</div>`;
-                    }
-                }, 2000);
-            }
-            
-            function displayResults(results) {
-                let html = '<div class="results"><h3>Scan Results</h3>';
-                
-                if (results.summary_statistics) {
-                    const stats = results.summary_statistics;
-                    html += `
-                        <div class="metric">
-                            <div class="value">${stats.total_systems}</div>
-                            <div class="label">Total Systems</div>
-                        </div>
-                        <div class="metric">
-                            <div class="value">${stats.compliant}</div>
-                            <div class="label">Compliant</div>
-                        </div>
-                        <div class="metric">
-                            <div class="value">${stats.non_compliant}</div>
-                            <div class="label">Non-Compliant</div>
-                        </div>
-                        <div class="metric">
-                            <div class="value">${stats.critical_violations}</div>
-                            <div class="label">Critical Issues</div>
-                        </div>
-                    `;
-                }
-                
-                html += '</div>';
-                document.getElementById('results').innerHTML = html;
-            }
-            
-            async function checkHealth() {
-                try {
-                    const response = await fetch('/api/health');
-                    const health = await response.json();
-                    
-                    let html = '<div class="status ';
-                    html += health.status === 'healthy' ? 'success' : 'error';
-                    html += `"><strong>System Health: ${health.status}</strong><br>`;
-                    html += `ServiceNow: ${health.servicenow ? '✅' : '❌'}<br>`;
-                    html += `OpenAI: ${health.openai ? '✅' : '❌'}</div>`;
-                    
-                    document.getElementById('health').innerHTML = html;
-                } catch (error) {
-                    document.getElementById('health').innerHTML = 
-                        `<div class="status error">Health check failed: ${error.message}</div>`;
-                }
-            }
-        </script>
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+        <link rel="stylesheet" href="/static/css/styles.css">
     </head>
     <body>
         <div class="container">
+            <!-- Header Section -->
             <div class="header">
-                <h1>🔍 ServiceNow CMDB Compliance Scanner</h1>
-                <p>Multi-Agent Network OS Compliance Analysis</p>
+                <h1><span class="emoji">🔍</span>ServiceNow CMDB Compliance Scanner</h1>
+                <p>Multi-Agent Network OS Compliance Analysis Platform</p>
             </div>
-            
-            <div class="section">
-                <h2>System Health</h2>
-                <button class="button" onclick="checkHealth()">Check Health</button>
-                <div id="health"></div>
-            </div>
-            
-            <div class="section">
-                <h2>Start Compliance Scan</h2>
-                <div class="form-group">
-                    <label for="scope">Scope:</label>
-                    <select id="scope">
-                        <option value="all">All Systems</option>
-                        <option value="servers">Servers Only</option>
-                        <option value="network">Network Devices</option>
-                    </select>
+
+            <!-- Main Grid Layout -->
+            <div class="grid">
+                <!-- System Health Card -->
+                <div class="card">
+                    <h2>🏥 System Health</h2>
+                    <button id="healthCheckBtn" class="btn btn-primary">Check Health Status</button>
+                    <div id="healthStatus"></div>
                 </div>
-                
-                <div class="form-group">
-                    <label for="mode">Mode:</label>
-                    <select id="mode">
-                        <option value="demo">Demo (Sample Data)</option>
-                        <option value="standalone">Standalone (Direct)</option>
-                        <option value="crewai">CrewAI (Full Workflow)</option>
-                    </select>
+
+                <!-- Quick Actions Card -->
+                <div class="card">
+                    <h2>⚡ Quick Actions</h2>
+                    <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                        <button id="quickDemo" class="btn btn-success btn-large">🧪 Run Demo Scan</button>
+                        <button id="viewScans" class="btn btn-secondary">📋 View Scan History</button>
+                        <a href="/docs" target="_blank" class="btn btn-secondary">📚 API Documentation</a>
+                    </div>
+                    <div id="recentScans" style="margin-top: 1rem;"></div>
                 </div>
-                
-                <div class="form-group">
-                    <label for="maxThreads">Max Threads:</label>
-                    <input type="number" id="maxThreads" value="5" min="1" max="20">
+
+                <!-- Scan Configuration Card -->
+                <div class="card grid-full">
+                    <h2>🎯 Configure Compliance Scan</h2>
+                    <form id="scanForm">
+                        <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+                            <div class="form-group">
+                                <label for="scope">📊 Scan Scope</label>
+                                <select id="scope" name="scope" class="form-control">
+                                    <option value="all">🌐 All Systems</option>
+                                    <option value="servers">🖥️ Servers Only</option>
+                                    <option value="network">🔗 Network Devices</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="mode">🚀 Execution Mode</label>
+                                <select id="mode" name="mode" class="form-control">
+                                    <option value="demo">🧪 Demo (Sample Data)</option>
+                                    <option value="standalone">⚡ Standalone (Direct)</option>
+                                    <option value="crewai">🤖 CrewAI (AI Workflow)</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="maxThreads">⚙️ Max Threads</label>
+                                <input type="number" id="maxThreads" name="maxThreads" 
+                                       class="form-control" value="5" min="1" max="20">
+                            </div>
+                            
+                            <div class="form-group" style="display: flex; align-items: end;">
+                                <button type="submit" id="startScanBtn" class="btn btn-primary btn-large" style="width: 100%;">
+                                    🚀 Start Compliance Scan
+                                </button>
+                            </div>
+                        </div>
+                    </form>
                 </div>
-                
-                <button class="button" onclick="startScan()">Start Scan</button>
+
+                <!-- Scan Progress Card -->
+                <div id="progressContainer" class="grid-full">
+                    <!-- Progress will be dynamically inserted here -->
+                </div>
+
+                <!-- Scan Status Card -->
+                <div class="card">
+                    <h2>📊 Scan Status</h2>
+                    <div id="scanStatus">
+                        <div class="alert alert-info">
+                            <div>No active scans. Configure and start a scan to begin compliance analysis.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Results Card -->
+                <div id="resultsContainer" class="grid-full">
+                    <!-- Results will be dynamically inserted here -->
+                </div>
             </div>
-            
-            <div class="section">
-                <h2>Scan Status</h2>
-                <div id="status">No active scans</div>
-            </div>
-            
-            <div class="section">
-                <h2>Results</h2>
-                <div id="results">No results yet</div>
-            </div>
-            
-            <div class="section">
-                <h2>Quick Actions</h2>
-                <button class="button secondary" onclick="window.open('/api/scans', '_blank')">View All Scans</button>
-                <button class="button secondary" onclick="window.open('/docs', '_blank')">API Documentation</button>
+
+            <!-- Footer -->
+            <div style="text-align: center; margin-top: 3rem; padding: 2rem; color: var(--gray-600);">
+                <p>ServiceNow CMDB Compliance Scanner | Multi-Agent CrewAI System</p>
+                <p style="font-size: 0.875rem;">Real-time OS compliance monitoring and risk assessment</p>
             </div>
         </div>
+
+        <script src="/static/js/app.js"></script>
     </body>
     </html>
     """
@@ -250,6 +170,9 @@ async def health_check():
     
     # Check ServiceNow connection
     try:
+        global ServiceNowConnector
+        if ServiceNowConnector is None:
+            from servicenow_connector import ServiceNowConnector
         connector = ServiceNowConnector()
         health["servicenow"] = True
     except:
@@ -353,6 +276,12 @@ async def execute_scan(scan_id: str, request: ScanRequest):
             })
             
             # ServiceNow extraction
+            global ServiceNowConnector, NetworkOSScanner
+            if ServiceNowConnector is None:
+                from servicenow_connector import ServiceNowConnector
+            if NetworkOSScanner is None:
+                from network_scanner import NetworkOSScanner
+                
             connector = ServiceNowConnector()
             cis = connector.get_network_elements()
             
@@ -382,6 +311,10 @@ async def execute_scan(scan_id: str, request: ScanRequest):
                 "message": "Executing CrewAI workflow..."
             })
             
+            global ComplianceScanningCrew
+            if ComplianceScanningCrew is None:
+                from crew import ComplianceScanningCrew
+                
             crew = ComplianceScanningCrew()
             crewai_result = crew.run_compliance_scan(request.scope)
             
