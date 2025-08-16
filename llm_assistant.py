@@ -28,6 +28,13 @@ try:
 except ImportError:
     EMBEDDINGS_AVAILABLE = False
 
+# Import the new GraphQL orchestrator
+try:
+    from llm_graphql_orchestrator import LLMGraphQLOrchestrator
+    GRAPHQL_ORCHESTRATOR_AVAILABLE = True
+except ImportError:
+    GRAPHQL_ORCHESTRATOR_AVAILABLE = False
+
 try:
     import chromadb
     from chromadb.config import Settings
@@ -46,12 +53,14 @@ class ComplianceAssistant:
         self.embeddings_model = None
         self.vector_db = None
         self.knowledge_base = {}
+        self.graphql_orchestrator = None
         
         # Initialize components based on available dependencies
         self._initialize_llm()
         self._initialize_embeddings()
         self._initialize_vector_db()
         self._load_knowledge_base()
+        self._initialize_graphql_orchestrator()
     
     def _initialize_llm(self):
         """Initialize LLM client (OpenAI API compatible)"""
@@ -271,30 +280,80 @@ class ComplianceAssistant:
         except Exception as e:
             logger.error(f"Failed to add knowledge item {knowledge['id']}: {e}")
     
+    def _initialize_graphql_orchestrator(self):
+        """Initialize GraphQL orchestrator for intelligent query generation"""
+        try:
+            if GRAPHQL_ORCHESTRATOR_AVAILABLE:
+                orchestrator_config = {
+                    "graphql_endpoint": self.config.get("graphql_endpoint", "http://localhost:8001/graphql"),
+                    "openai_api_key": self.config.get("llm", {}).get("api_key"),
+                    "chroma_collection": "compliance_assistant"
+                }
+                self.graphql_orchestrator = LLMGraphQLOrchestrator(orchestrator_config)
+                logger.info("✅ GraphQL orchestrator initialized")
+            else:
+                logger.warning("GraphQL orchestrator not available")
+        except Exception as e:
+            logger.error(f"Failed to initialize GraphQL orchestrator: {e}")
+            self.graphql_orchestrator = None
+    
     async def ask_question(
         self, 
         question: str, 
         context: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
-        """Ask a question to the compliance assistant"""
+        """Ask a question to the compliance assistant with GraphQL orchestration and RAG"""
         
         try:
-            # Retrieve relevant knowledge using RAG
-            relevant_knowledge = await self._retrieve_knowledge(question)
+            # Check if this is a data query that can benefit from GraphQL orchestration
+            if self.graphql_orchestrator and await self._is_data_query(question):
+                logger.info(f"🚀 Using GraphQL orchestration for: {question}")
+                
+                # Initialize orchestrator if not done yet
+                if not hasattr(self.graphql_orchestrator, 'openai_client') or not self.graphql_orchestrator.openai_client:
+                    await self.graphql_orchestrator.initialize()
+                
+                # Use GraphQL orchestrator for data-driven questions
+                orchestrated_result = await self.graphql_orchestrator.process_question(question, context)
+                
+                # Enhance with additional RAG context if needed
+                if orchestrated_result.get("confidence", 0) < 0.8:
+                    logger.info("🔍 Enhancing with additional RAG context")
+                    additional_context = await self._retrieve_knowledge(question)
+                    orchestrated_result["additional_sources"] = [k["metadata"]["title"] for k in additional_context]
+                
+                return {
+                    "question": question,
+                    "answer": orchestrated_result["answer"],
+                    "method": "graphql_orchestration",
+                    "sources": orchestrated_result.get("additional_sources", []),
+                    "graphql_query": orchestrated_result.get("graphql_query"),
+                    "data": orchestrated_result.get("data"),
+                    "confidence": orchestrated_result.get("confidence", 0.8),
+                    "timestamp": datetime.now().isoformat(),
+                    "context_used": bool(context)
+                }
             
-            # Build context-aware prompt
-            prompt = await self._build_prompt(question, relevant_knowledge, context)
-            
-            # Generate response using LLM
-            response = await self._generate_response(prompt)
-            
-            return {
-                "question": question,
-                "answer": response,
-                "sources": [k["metadata"]["title"] for k in relevant_knowledge],
-                "timestamp": datetime.now().isoformat(),
-                "context_used": bool(context)
-            }
+            else:
+                logger.info(f"📚 Using traditional RAG for: {question}")
+                
+                # Use traditional RAG approach for general knowledge questions
+                relevant_knowledge = await self._retrieve_knowledge(question)
+                
+                # Build context-aware prompt
+                prompt = await self._build_prompt(question, relevant_knowledge, context)
+                
+                # Generate response using LLM
+                response = await self._generate_response(prompt)
+                
+                return {
+                    "question": question,
+                    "answer": response,
+                    "method": "traditional_rag",
+                    "sources": [k["metadata"]["title"] for k in relevant_knowledge],
+                    "timestamp": datetime.now().isoformat(),
+                    "context_used": bool(context)
+                }
             
         except Exception as e:
             logger.error(f"Error processing question: {e}")
@@ -305,6 +364,35 @@ class ComplianceAssistant:
                 "timestamp": datetime.now().isoformat(),
                 "error": str(e)
             }
+    
+    async def _is_data_query(self, question: str) -> bool:
+        """Determine if question requires data retrieval via GraphQL"""
+        
+        question_lower = question.lower()
+        
+        # Data query indicators
+        data_keywords = [
+            "show", "find", "get", "list", "how many", "what are", "which",
+            "compliance", "systems", "critical", "failing", "violations",
+            "business unit", "risk score", "recent", "summary", "dashboard",
+            "network", "devices", "servers", "status", "scan"
+        ]
+        
+        # Knowledge-only indicators (should use RAG instead)
+        knowledge_keywords = [
+            "what is", "explain", "how to", "why", "definition", "meaning",
+            "best practice", "recommend", "should i", "policy", "procedure"
+        ]
+        
+        # Check for data query patterns
+        has_data_keywords = any(keyword in question_lower for keyword in data_keywords)
+        has_knowledge_keywords = any(keyword in question_lower for keyword in knowledge_keywords)
+        
+        # Prefer GraphQL for data queries, RAG for knowledge questions
+        if has_knowledge_keywords and not has_data_keywords:
+            return False
+        
+        return has_data_keywords or (not has_knowledge_keywords)
     
     async def _retrieve_knowledge(self, query: str, n_results: int = 3) -> List[Dict[str, Any]]:
         """Retrieve relevant knowledge using semantic search"""

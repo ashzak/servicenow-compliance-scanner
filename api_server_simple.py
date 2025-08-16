@@ -22,6 +22,18 @@ from pathlib import Path
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# GraphQL imports
+try:
+    import strawberry
+    from strawberry.fastapi import GraphQLRouter
+    from graphql_schema import schema
+    GRAPHQL_AVAILABLE = True
+    logger.info("✅ Strawberry GraphQL loaded successfully")
+except ImportError as e:
+    GRAPHQL_AVAILABLE = False
+    logger.warning(f"⚠️  Strawberry GraphQL not available: {e}")
+    logger.warning("   Install with: pip install 'strawberry-graphql[fastapi]'")
+
 # Pydantic models for API
 class ScanRequest(BaseModel):
     target_ips: List[str] = Field(..., description="List of IP addresses to scan")
@@ -83,6 +95,18 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Add GraphQL router if available
+if GRAPHQL_AVAILABLE:
+    try:
+        graphql_app = GraphQLRouter(schema)
+        app.include_router(graphql_app, prefix="/graphql")
+        logger.info("✅ GraphQL endpoint enabled at /graphql")
+    except Exception as e:
+        logger.error(f"Failed to initialize GraphQL: {e}")
+        GRAPHQL_AVAILABLE = False
+else:
+    logger.warning("⚠️  GraphQL not available - install strawberry-graphql: pip install strawberry-graphql")
 
 # In-memory store for demo (would be replaced with database)
 active_scans: Dict[str, Dict[str, Any]] = {}

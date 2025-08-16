@@ -6,6 +6,9 @@ uvicorn[standard]>=0.24.0
 pydantic>=2.5.0
 asyncio-pool>=0.6.0
 
+# GraphQL support
+strawberry-graphql[fastapi]>=0.214.1
+
 # Database and caching
 asyncpg>=0.29.0
 psycopg2-binary>=2.9.7
