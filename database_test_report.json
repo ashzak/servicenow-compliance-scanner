@@ -1,0 +1,80 @@
+{
+  "test_timestamp": "2025-08-16T13:35:32.029311",
+  "database_connection": true,
+  "direct_queries": true,
+  "test_results": {
+    "tables_count": 8,
+    "compliance_summary": {
+      "total_findings": 5,
+      "total_systems": 5,
+      "compliant": 1,
+      "warnings": 1,
+      "critical": 3,
+      "avg_risk_score": "65.0"
+    },
+    "compliance_score": 20.0,
+    "business_units": [
+      {
+        "business_unit": "Finance",
+        "system_count": 1,
+        "critical_systems": 1,
+        "avg_risk": "90.0"
+      },
+      {
+        "business_unit": "IT Operations",
+        "system_count": 1,
+        "critical_systems": 1,
+        "avg_risk": "80.0"
+      },
+      {
+        "business_unit": "Marketing",
+        "system_count": 1,
+        "critical_systems": 0,
+        "avg_risk": "60.0"
+      },
+      {
+        "business_unit": "Engineering",
+        "system_count": 2,
+        "critical_systems": 1,
+        "avg_risk": "47.5"
+      }
+    ],
+    "recent_findings": [
+      {
+        "name": "legacy-dc-01",
+        "status": "fail",
+        "risk_score": 90,
+        "reason": "Past End-of-Life (2020-01-14)",
+        "created_at": "2025-08-16 18:33:21.728615+00:00"
+      },
+      {
+        "name": "web-app-02",
+        "status": "warn",
+        "risk_score": 60,
+        "reason": "EOL in 45 days",
+        "created_at": "2025-08-16 18:33:21.728615+00:00"
+      },
+      {
+        "name": "app-server-03",
+        "status": "pass",
+        "risk_score": 0,
+        "reason": "Compliant - Windows Server 2022",
+        "created_at": "2025-08-16 18:33:21.728615+00:00"
+      },
+      {
+        "name": "core-switch-01",
+        "status": "fail",
+        "risk_score": 80,
+        "reason": "Past End-of-Support (2019-07-31)",
+        "created_at": "2025-08-16 18:33:21.728615+00:00"
+      },
+      {
+        "name": "db-server-prod",
+        "status": "fail",
+        "risk_score": 95,
+        "reason": "Critical vulnerability CVE-2023-12345 - Known exploited",
+        "created_at": "2025-08-16 18:33:21.728615+00:00"
+      }
+    ]
+  }
+}

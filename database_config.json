@@ -1,0 +1,12 @@
+{
+  "database": {
+    "host": "localhost",
+    "port": 5432,
+    "database": "cmdb_compliance",
+    "username": "compliance_user",
+    "password": "secure_compliance_pass_2024!",
+    "pool_min_size": 5,
+    "pool_max_size": 20,
+    "command_timeout": 30
+  }
+}

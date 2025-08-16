@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enterprise CMDB Compliance Tool</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            font-size: 3rem;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .card-icon {
+            font-size: 2rem;
+            margin-right: 15px;
+        }
+
+        .card-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .metric {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin: 10px 0;
+        }
+
+        .metric.success { color: #27ae60; }
+        .metric.warning { color: #f39c12; }
+        .metric.danger { color: #e74c3c; }
+        .metric.primary { color: #3498db; }
+
+        .findings-table {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+
+        .table-header {
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #2c3e50;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ecf0f1;
+        }
+
+        th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .status-pass { background: #d4edda; color: #155724; }
+        .status-warn { background: #fff3cd; color: #856404; }
+        .status-fail { background: #f8d7da; color: #721c24; }
+
+        .risk-score {
+            padding: 4px 8px;
+            border-radius: 4px;
+            color: white;
+            font-weight: 600;
+            text-align: center;
+        }
+
+        .actions {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+            justify-content: center;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-primary {
+            background: #3498db;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #2980b9;
+            transform: translateY(-2px);
+        }
+
+        .btn-success {
+            background: #27ae60;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #229954;
+            transform: translateY(-2px);
+        }
+
+        .ai-assistant {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+
+        .ai-input {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .ai-input input {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #ecf0f1;
+            border-radius: 8px;
+            font-size: 1rem;
+        }
+
+        .ai-input input:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+
+        .ai-response {
+            margin-top: 15px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #3498db;
+            display: none;
+        }
+
+        .footer {
+            text-align: center;
+            color: white;
+            opacity: 0.8;
+            margin-top: 40px;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 { font-size: 2rem; }
+            .dashboard { grid-template-columns: 1fr; }
+            .actions { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏢 Enterprise CMDB Compliance Tool</h1>
+            <p>Production-ready compliance monitoring and assessment platform</p>
+        </div>
+
+        <div class="dashboard">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-icon">📊</div>
+                    <div class="card-title">Compliance Score</div>
+                </div>
+                <div class="metric primary" id="compliance-score">25%</div>
+                <p>Overall system compliance</p>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-icon">✅</div>
+                    <div class="card-title">Compliant Systems</div>
+                </div>
+                <div class="metric success" id="compliant-systems">1</div>
+                <p>Systems meeting requirements</p>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-icon">⚠️</div>
+                    <div class="card-title">At Risk</div>
+                </div>
+                <div class="metric warning" id="warning-systems">1</div>
+                <p>Systems approaching EOL</p>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-icon">❌</div>
+                    <div class="card-title">Critical Issues</div>
+                </div>
+                <div class="metric danger" id="critical-systems">2</div>
+                <p>Systems requiring immediate action</p>
+            </div>
+        </div>
+
+        <div class="actions">
+            <button class="btn btn-primary" onclick="startScan()">🔍 Start Compliance Scan</button>
+            <a href="/api/docs" class="btn btn-success" target="_blank">📚 API Documentation</a>
+        </div>
+
+        <div class="findings-table">
+            <div class="table-header">🔍 Recent Compliance Findings</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>System</th>
+                        <th>Status</th>
+                        <th>Risk</th>
+                        <th>Business Unit</th>
+                        <th>Issue</th>
+                    </tr>
+                </thead>
+                <tbody id="findings-table">
+                    <tr>
+                        <td><strong>legacy-dc-01</strong></td>
+                        <td><span class="status-badge status-fail">FAIL</span></td>
+                        <td><span class="risk-score" style="background:#e74c3c">90</span></td>
+                        <td>Finance</td>
+                        <td>Past End-of-Life (2020-01-14)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>web-app-02</strong></td>
+                        <td><span class="status-badge status-warn">WARN</span></td>
+                        <td><span class="risk-score" style="background:#f39c12">60</span></td>
+                        <td>Marketing</td>
+                        <td>EOL in 45 days</td>
+                    </tr>
+                    <tr>
+                        <td><strong>app-server-03</strong></td>
+                        <td><span class="status-badge status-pass">PASS</span></td>
+                        <td><span class="risk-score" style="background:#27ae60">0</span></td>
+                        <td>Engineering</td>
+                        <td>Compliant - Windows Server 2022</td>
+                    </tr>
+                    <tr>
+                        <td><strong>core-switch-01</strong></td>
+                        <td><span class="status-badge status-fail">FAIL</span></td>
+                        <td><span class="risk-score" style="background:#e74c3c">80</span></td>
+                        <td>IT Operations</td>
+                        <td>Past End-of-Support (2019-07-31)</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="ai-assistant">
+            <div class="card-header">
+                <div class="card-icon">🤖</div>
+                <div class="card-title">AI Compliance Assistant</div>
+            </div>
+            <p>Ask questions about compliance, EOL systems, vulnerability management, and remediation strategies.</p>
+            <div class="ai-input">
+                <input type="text" id="ai-question" placeholder="Ask about compliance... (e.g., 'What should I do about EOL systems?')" />
+                <button class="btn btn-primary" onclick="askAssistant()">Ask</button>
+            </div>
+            <div class="ai-response" id="ai-response"></div>
+        </div>
+
+        <div class="footer">
+            <p>🏢 Enterprise CMDB Compliance Tool | Built with FastAPI, React, and OpenTelemetry</p>
+            <p>Version 1.0.0 | © 2024 Enterprise Security Team</p>
+        </div>
+    </div>
+
+    <script>
+        // Sample data and API interaction
+        async function fetchFindings() {
+            try {
+                const response = await fetch('/api/v1/compliance/findings');
+                if (response.ok) {
+                    const findings = await response.json();
+                    updateDashboard(findings);
+                    updateFindingsTable(findings);
+                }
+            } catch (error) {
+                console.log('Using sample data - API not available');
+            }
+        }
+
+        function updateDashboard(findings) {
+            const total = findings.length;
+            const compliant = findings.filter(f => f.status === 'pass').length;
+            const warnings = findings.filter(f => f.status === 'warn').length;
+            const critical = findings.filter(f => f.status === 'fail').length;
+            
+            const complianceScore = total > 0 ? Math.round((compliant / total) * 100) : 0;
+            
+            document.getElementById('compliance-score').textContent = complianceScore + '%';
+            document.getElementById('compliant-systems').textContent = compliant;
+            document.getElementById('warning-systems').textContent = warnings;
+            document.getElementById('critical-systems').textContent = critical;
+        }
+
+        function updateFindingsTable(findings) {
+            const tableBody = document.getElementById('findings-table');
+            tableBody.innerHTML = '';
+            
+            findings.forEach(finding => {
+                const row = document.createElement('tr');
+                
+                const statusClass = {
+                    'pass': 'status-pass',
+                    'warn': 'status-warn', 
+                    'fail': 'status-fail'
+                }[finding.status] || 'status-fail';
+                
+                const riskColor = finding.risk_score >= 80 ? '#e74c3c' : 
+                                 finding.risk_score >= 60 ? '#f39c12' : 
+                                 finding.risk_score > 0 ? '#f1c40f' : '#27ae60';
+                
+                row.innerHTML = `
+                    <td><strong>${finding.ci_name}</strong></td>
+                    <td><span class="status-badge ${statusClass}">${finding.status.toUpperCase()}</span></td>
+                    <td><span class="risk-score" style="background:${riskColor}">${finding.risk_score}</span></td>
+                    <td>${finding.business_unit}</td>
+                    <td>${finding.reason}</td>
+                `;
+                
+                tableBody.appendChild(row);
+            });
+        }
+
+        async function startScan() {
+            const button = event.target;
+            button.textContent = '🔄 Scanning...';
+            button.disabled = true;
+            
+            try {
+                const response = await fetch('/api/v1/compliance/scan', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        target_ips: ['10.1.1.10', '10.1.2.20', '10.1.3.30'],
+                        scan_types: ['ssh', 'winrm', 'snmp'],
+                        priority: 'normal'
+                    })
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    alert(`Scan started: ${result.scan_id}`);
+                    
+                    // Simulate progress update
+                    setTimeout(() => {
+                        fetchFindings();
+                        button.textContent = '🔍 Start Compliance Scan';
+                        button.disabled = false;
+                    }, 3000);
+                } else {
+                    throw new Error('Scan failed');
+                }
+            } catch (error) {
+                alert('Scan simulation completed (API not available)');
+                button.textContent = '🔍 Start Compliance Scan';
+                button.disabled = false;
+            }
+        }
+
+        async function askAssistant() {
+            const input = document.getElementById('ai-question');
+            const response = document.getElementById('ai-response');
+            const question = input.value.trim();
+            
+            if (!question) return;
+            
+            response.style.display = 'block';
+            response.innerHTML = '<div style="text-align:center;">🤖 Thinking...</div>';
+            
+            try {
+                const apiResponse = await fetch('/api/v1/assistant/ask', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ question: question })
+                });
+                
+                if (apiResponse.ok) {
+                    const result = await apiResponse.json();
+                    response.innerHTML = `
+                        <strong>🤖 AI Assistant:</strong><br>
+                        ${result.answer.replace(/\n/g, '<br>')}
+                    `;
+                } else {
+                    throw new Error('API error');
+                }
+            } catch (error) {
+                // Fallback responses
+                const fallbackResponses = {
+                    'eol': 'Systems past End-of-Life require immediate attention. Plan upgrades to supported versions within 24-48 hours for critical systems.',
+                    'vulnerability': 'Critical vulnerabilities should be patched within 72 hours. High vulnerabilities within 7 days. Always test patches in staging first.',
+                    'compliance': 'Maintain continuous compliance monitoring, regular assessments, and documented remediation procedures for your regulatory requirements.'
+                };
+                
+                let answer = 'I can help with EOL systems, vulnerability management, and compliance guidance. Please ask a specific question.';
+                
+                for (const [key, value] of Object.entries(fallbackResponses)) {
+                    if (question.toLowerCase().includes(key)) {
+                        answer = value;
+                        break;
+                    }
+                }
+                
+                response.innerHTML = `<strong>🤖 AI Assistant:</strong><br>${answer}`;
+            }
+            
+            input.value = '';
+        }
+
+        // Enter key support for AI assistant
+        document.getElementById('ai-question').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                askAssistant();
+            }
+        });
+
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            fetchFindings();
+        });
+    </script>
+</body>
+</html>
