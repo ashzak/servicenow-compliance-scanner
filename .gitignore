@@ -52,15 +52,38 @@ standalone_test_results_*.json
 compliance_scan_*/
 *.log
 
-# Environment variables and secrets
+# Environment variables and secrets - NEVER COMMIT THESE
 .env
 .env.local
 .env.production
 .env.staging
+.env.database
+*.env
+api_keys.txt
+secrets.json
+openai_key.txt
 
 # ServiceNow credentials (security)
 servicenow_config.json
 credentials.json
+
+# Database files with potentially sensitive data
+*.db
+*.sqlite3
+eol_cache.db
+chroma_db/
+compliance_chroma_db/
+database_config.json
+
+# Vault tokens and credentials
+vault_token
+service_account.json
+
+# Any files containing API keys or tokens
+*_key
+*_token
+*_secret
+*_password
 
 # Temporary files
 *.tmp
