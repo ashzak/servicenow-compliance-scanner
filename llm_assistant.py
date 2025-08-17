@@ -20,6 +20,13 @@ try:
     OPENAI_AVAILABLE = True
 except ImportError:
     OPENAI_AVAILABLE = False
+
+# Copilot imports
+try:
+    from copilot_client import create_copilot_client, AsyncCopilot
+    COPILOT_AVAILABLE = True
+except ImportError:
+    COPILOT_AVAILABLE = False
     
 try:
     from sentence_transformers import SentenceTransformer
@@ -63,13 +70,19 @@ class ComplianceAssistant:
         self._initialize_graphql_orchestrator()
     
     def _initialize_llm(self):
-        """Initialize LLM client (OpenAI API compatible)"""
+        """Initialize LLM client (OpenAI/Copilot API compatible)"""
         try:
-            if OPENAI_AVAILABLE:
-                # Support for both OpenAI and vLLM endpoints
-                api_key = self.config.get("llm", {}).get("api_key", "demo-key")
-                base_url = self.config.get("llm", {}).get("base_url")
+            llm_provider = self.config.get("llm", {}).get("provider", "openai")
+            api_key = self.config.get("llm", {}).get("api_key", "demo-key")
+            base_url = self.config.get("llm", {}).get("base_url")
+            
+            if llm_provider.lower() == "copilot" and COPILOT_AVAILABLE:
+                # Microsoft Copilot integration
+                self.llm_client = create_copilot_client(api_key=api_key, base_url=base_url)
+                logger.info("✅ Initialized Microsoft Copilot client")
                 
+            elif OPENAI_AVAILABLE:
+                # Support for both OpenAI and vLLM endpoints
                 if base_url:
                     # vLLM server endpoint
                     self.llm_client = AsyncOpenAI(
@@ -82,7 +95,7 @@ class ComplianceAssistant:
                     self.llm_client = AsyncOpenAI(api_key=api_key)
                     logger.info("Initialized OpenAI client")
             else:
-                logger.warning("OpenAI library not available, using mock LLM responses")
+                logger.warning("No LLM provider available, using mock LLM responses")
                 self.llm_client = MockLLMClient()
                 
         except Exception as e:

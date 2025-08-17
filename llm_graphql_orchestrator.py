@@ -28,6 +28,13 @@ try:
 except ImportError:
     OPENAI_AVAILABLE = False
 
+# Copilot imports
+try:
+    from copilot_client import create_copilot_client
+    COPILOT_AVAILABLE = True
+except ImportError:
+    COPILOT_AVAILABLE = False
+
 # Vector database imports
 try:
     import chromadb
@@ -61,7 +68,9 @@ class LLMGraphQLOrchestrator:
     
     def __init__(self, config: Dict[str, Any]):
         self.graphql_endpoint = config.get("graphql_endpoint", "http://localhost:8001/graphql")
+        self.llm_provider = config.get("llm_provider", "openai")
         self.openai_api_key = config.get("openai_api_key")
+        self.copilot_api_key = config.get("copilot_api_key")
         self.chroma_collection_name = config.get("chroma_collection", "compliance_rag")
         
         # Initialize components
@@ -130,10 +139,16 @@ Generate GraphQL query (JSON format):
     async def initialize(self):
         """Initialize all components"""
         try:
-            # Initialize OpenAI
-            if OPENAI_AVAILABLE and self.openai_api_key:
+            # Initialize LLM client based on provider
+            if self.llm_provider.lower() == "copilot" and COPILOT_AVAILABLE:
+                self.openai_client = create_copilot_client(api_key=self.copilot_api_key)
+                logger.info("✅ Microsoft Copilot client initialized")
+            elif OPENAI_AVAILABLE and self.openai_api_key:
                 self.openai_client = openai.AsyncOpenAI(api_key=self.openai_api_key)
                 logger.info("✅ OpenAI client initialized")
+            else:
+                logger.warning("No LLM client available - using fallback responses")
+                self.openai_client = None
             
             # Initialize vector store
             if CHROMADB_AVAILABLE:
@@ -145,7 +160,7 @@ Generate GraphQL query (JSON format):
             # Load query templates
             self._load_query_templates()
             
-            logger.info("✅ LLM GraphQL Orchestrator initialized")
+            logger.info(f"✅ LLM GraphQL Orchestrator initialized with {self.llm_provider}")
             
         except Exception as e:
             logger.error(f"Failed to initialize LLM GraphQL Orchestrator: {e}")

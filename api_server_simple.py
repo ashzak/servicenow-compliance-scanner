@@ -360,27 +360,49 @@ async def get_system_compliance(ci_id: str):
 ai_assistant = None
 
 async def initialize_ai():
-    """Initialize AI assistant with real OpenAI"""
+    """Initialize AI assistant with configurable LLM provider"""
     global ai_assistant
     
+    # Check for LLM provider configuration
+    llm_provider = os.getenv("LLM_PROVIDER", "openai").lower()
     openai_key = os.getenv("OPENAI_API_KEY", "")
+    copilot_key = os.getenv("COPILOT_API_KEY") or os.getenv("GITHUB_TOKEN", "")
     
     try:
         # Try to import and use real AI assistant
         from llm_assistant import ComplianceAssistant
         
-        config = {
-            "llm": {
-                "provider": "openai",
-                "model": "gpt-3.5-turbo",
-                "api_key": openai_key,
-                "max_tokens": 1000,
-                "temperature": 0.1
+        # Configure based on LLM provider
+        if llm_provider == "copilot":
+            config = {
+                "llm": {
+                    "provider": "copilot",
+                    "api_key": copilot_key,
+                    "base_url": None
+                },
+                "vector_db": {
+                    "persist_directory": "./compliance_chroma_db"
+                },
+                "graphql_endpoint": "http://localhost:8001/graphql"
             }
-        }
+            logger.info("🤖 Configuring Microsoft Copilot integration")
+        else:
+            config = {
+                "llm": {
+                    "provider": "openai",
+                    "api_key": openai_key,
+                    "base_url": None
+                },
+                "vector_db": {
+                    "persist_directory": "./compliance_chroma_db"
+                },
+                "graphql_endpoint": "http://localhost:8001/graphql"
+            }
+            logger.info("🤖 Configuring OpenAI integration")
         
         ai_assistant = ComplianceAssistant(config)
-        logger.info("✅ Real AI Assistant initialized with OpenAI!")
+        provider_name = "Microsoft Copilot" if llm_provider == "copilot" else "OpenAI"
+        logger.info(f"✅ Real AI Assistant initialized with {provider_name}!")
         return True
     except Exception as e:
         logger.warning(f"⚠️ Could not initialize real AI: {e}")
